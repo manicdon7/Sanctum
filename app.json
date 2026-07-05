@@ -20,6 +20,19 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      "expo-sqlite",
+      "expo-secure-store",
+      "expo-sharing",
+      "expo-font"
+    ],
+    "extra": {
+      "syncBackendUrl": {},
+      "eas": {
+        "projectId": "c5acb525-6ec1-45d7-8455-b9143840e7ad"
+      }
+    },
+    "owner": "manikandan05"
   }
 }
