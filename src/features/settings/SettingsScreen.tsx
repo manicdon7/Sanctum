@@ -1,338 +1,359 @@
+// Settings Screen
+// A quiet, honest screen. Not a control panel.
+
 import React, { useState } from 'react';
 import {
   View,
   Text,
   ScrollView,
-  StyleSheet,
-  Switch,
   TouchableOpacity,
-  useColorScheme,
-  Alert,
-  Platform,
+  TextInput,
+  StyleSheet,
   StatusBar,
-  Linking,
+  Alert,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
 
-import { lightColors, darkColors, palette } from '@/core/theme/colors';
-import { fontFamilies, fontSize, fontWeight } from '@/core/theme/typography';
-import { spacing, radius, layout } from '@/core/theme/spacing';
-import { useAppStore, type AmbientTrack } from '@/core/stores/appStore';
+import { useTheme } from '../../core/theme/useTheme';
+import { useAppStore } from '../../core/stores/useAppStore';
+import { useUserStore } from '../../core/stores/useUserStore';
+import { spacing } from '../../core/theme/spacing';
+import { borderRadius } from '../../core/theme/radius';
+import { ui, display } from '../../core/theme/typography';
 
-const APP_VERSION = '1.0.0';
-
-// ── Setting Row ────────────────────────────────────────────────────────────────
-
-interface SettingRowProps {
-  icon: keyof typeof Feather.glyphMap;
-  iconColor?: string;
-  label: string;
-  value?: React.ReactNode;
-  onPress?: () => void;
-  chevron?: boolean;
-  destructive?: boolean;
-  colors: typeof lightColors;
+interface SettingSectionProps {
+  title: string;
+  children: React.ReactNode;
 }
 
-function SettingRow({
-  icon,
-  iconColor,
-  label,
-  value,
-  onPress,
-  chevron = false,
-  destructive = false,
-  colors,
-}: SettingRowProps) {
-  const labelColor = destructive ? palette.crisis : colors.text.primary;
-  const defaultIconColor = iconColor ?? (destructive ? palette.crisis : colors.text.secondary);
+function SettingSection({ title, children }: SettingSectionProps) {
+  const { colors } = useTheme();
+  
+  return (
+    <View style={styles.section}>
+      <Text style={[
+        styles.sectionTitle,
+        ui.label,
+        { color: colors.text_muted },
+      ]}>
+        {title}
+      </Text>
+      <View style={styles.sectionContent}>
+        {children}
+      </View>
+    </View>
+  );
+}
 
+interface SettingItemProps {
+  label: string;
+  value?: string;
+  onPress?: () => void;
+  children?: React.ReactNode;
+}
+
+function SettingItem({ label, value, onPress, children }: SettingItemProps) {
+  const { colors } = useTheme();
+  
   return (
     <TouchableOpacity
-      style={[styles.settingRow, { borderBottomColor: colors.divider }]}
+      style={[styles.settingItem, { borderBottomColor: colors.divider }]}
       onPress={onPress}
       disabled={!onPress}
-      activeOpacity={onPress ? 0.6 : 1}
     >
-      <View style={[styles.settingIcon, { backgroundColor: `${defaultIconColor}16` }]}>
-        <Feather name={icon} size={16} color={defaultIconColor} />
-      </View>
-      <Text style={[styles.settingLabel, { color: labelColor, flex: 1 }]}>{label}</Text>
-      {value !== undefined ? <View style={styles.settingValue}>{value}</View> : null}
-      {chevron ? <Feather name="chevron-right" size={16} color={colors.text.muted} style={{ marginLeft: 4 }} /> : null}
+      <Text style={[styles.settingLabel, ui.body, { color: colors.text_primary }]}>
+        {label}
+      </Text>
+      {value && (
+        <Text style={[styles.settingValue, ui.body, { color: colors.text_secondary }]}>
+          {value}
+        </Text>
+      )}
+      {children}
     </TouchableOpacity>
   );
 }
 
-// ── Section header ─────────────────────────────────────────────────────────────
-
-function SectionHeader({ label, colors }: { label: string; colors: typeof lightColors }) {
-  return (
-    <Text style={[styles.sectionHeader, { color: colors.text.muted }]}>{label}</Text>
-  );
-}
-
-// ── Main Screen ────────────────────────────────────────────────────────────────
-
 export function SettingsScreen() {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
-  const colors = isDark ? darkColors : lightColors;
+  const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  
+  const {
+    colorScheme,
+    timeOfDayBackground,
+    reduceAnimations,
+    biometricEnabled,
+    setColorScheme,
+    setTimeOfDayBackground,
+    setReduceAnimations,
+    setBiometricEnabled,
+  } = useAppStore();
+  
+  const {
+    companionName,
+    setCompanionName,
+    resetContext,
+  } = useUserStore();
+  
+  const [editingCompanionName, setEditingCompanionName] = useState(false);
+  const [tempCompanionName, setTempCompanionName] = useState(companionName);
 
-  const biometricEnabled   = useAppStore((s) => s.biometricEnabled);
-  const setBiometricEnabled = useAppStore((s) => s.setBiometricEnabled);
-  const companionUseCloud  = useAppStore((s) => s.companionUseCloud);
-  const setCompanionUseCloud = useAppStore((s) => s.setCompanionUseCloud);
-  const ambientTrack       = useAppStore((s) => s.ambientTrack);
-  const setAmbientTrack    = useAppStore((s) => s.setAmbientTrack);
-  const ambientVolume      = useAppStore((s) => s.ambientVolume);
-  const setAmbientVolume   = useAppStore((s) => s.setAmbientVolume);
-  const lock               = useAppStore((s) => s.lock);
+  const handleCompanionNameSave = () => {
+    if (tempCompanionName.trim()) {
+      setCompanionName(tempCompanionName.trim());
+    }
+    setEditingCompanionName(false);
+  };
 
-  const AMBIENT_OPTIONS: AmbientTrack[] = ['none', 'rain', 'lofi'];
+  const handleContextReset = () => {
+    Alert.alert(
+      'Forget Everything',
+      'This will clear everything Juliet knows about you. Your conversations will remain, but her memory of your patterns and preferences will be reset.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset',
+          style: 'destructive',
+          onPress: resetContext,
+        },
+      ]
+    );
+  };
 
-  function handleToggleBiometric(val: boolean) {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setBiometricEnabled(val);
-  }
+  const handleDataExport = () => {
+    // TODO: Implement data export
+    Alert.alert('Export Data', 'Data export feature coming soon.');
+  };
 
-  function handleToggleCloud(val: boolean) {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setCompanionUseCloud(val);
-  }
-
-  function handleLock() {
-    Alert.alert('Lock Sanctum', 'Lock and return to the lock screen?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Lock', onPress: () => lock() },
-    ]);
-  }
-
-  function handleAmbientCycle() {
-    const idx = AMBIENT_OPTIONS.indexOf(ambientTrack);
-    const next = AMBIENT_OPTIONS[(idx + 1) % AMBIENT_OPTIONS.length]!;
-    setAmbientTrack(next);
-  }
+  const handleDataClear = () => {
+    Alert.alert(
+      'Clear All Data',
+      'This will permanently delete all your notes, conversations, and settings. This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete Everything',
+          style: 'destructive',
+          onPress: () => {
+            // TODO: Implement full data clear
+            Alert.alert('Data Clear', 'Full data clearing coming soon.');
+          },
+        },
+      ]
+    );
+  };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
-
-      {/* Header */}
-      <View style={[styles.pageHeader, { paddingTop: insets.top + 12, borderBottomColor: colors.divider }]}>
-        <Text style={[styles.pageTitle, { color: colors.text.primary }]}>Settings</Text>
-      </View>
-
+    <View style={[styles.container, { backgroundColor: colors.bg_base }]}>
+      <StatusBar barStyle="light-content" backgroundColor={colors.bg_base} />
+      
       <ScrollView
-        contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100 }]}
-        showsVerticalScrollIndicator={false}
+        style={styles.scrollView}
+        contentContainerStyle={[
+          styles.content,
+          { paddingTop: insets.top, paddingBottom: insets.bottom },
+        ]}
       >
-        {/* ── Privacy & Security ── */}
-        <SectionHeader label="PRIVACY & SECURITY" colors={colors} />
-        <View style={[styles.section, { backgroundColor: colors.surfaceRaised, borderColor: colors.border }]}>
-          <SettingRow
-            icon="lock"
-            iconColor={palette.amber}
-            label="Biometric unlock"
-            value={
-              <Switch
-                value={biometricEnabled}
-                onValueChange={handleToggleBiometric}
-                trackColor={{ false: colors.border, true: `${palette.amber}60` }}
-                thumbColor={biometricEnabled ? palette.amber : colors.text.muted}
-              />
-            }
-            colors={colors}
+        {/* Your Room */}
+        <SettingSection title="YOUR ROOM">
+          <SettingItem
+            label="Theme"
+            value={colorScheme === 'system' ? 'Follow System' : colorScheme === 'dark' ? 'Dark' : 'Light'}
+            onPress={() => {
+              // TODO: Show theme picker
+            }}
           />
-          <SettingRow
-            icon="shield"
-            iconColor={palette.success}
-            label="Encryption"
-            value={<Text style={[styles.valueText, { color: colors.text.muted }]}>AES-256-GCM</Text>}
-            colors={colors}
-          />
-          <SettingRow
-            icon="log-out"
-            label="Lock now"
-            onPress={handleLock}
-            chevron
-            colors={colors}
-          />
-        </View>
+          
+          <SettingItem label="Time-of-day background">
+            <TouchableOpacity
+              onPress={() => setTimeOfDayBackground(!timeOfDayBackground)}
+              style={[
+                styles.toggle,
+                timeOfDayBackground && { backgroundColor: colors.accent },
+              ]}
+            >
+              <View style={[
+                styles.toggleKnob,
+                {
+                  backgroundColor: timeOfDayBackground ? colors.bg_base : colors.text_ghost,
+                  transform: [{ translateX: timeOfDayBackground ? 16 : 0 }],
+                },
+              ]} />
+            </TouchableOpacity>
+          </SettingItem>
+          
+          <SettingItem label="Reduce animations">
+            <TouchableOpacity
+              onPress={() => setReduceAnimations(!reduceAnimations)}
+              style={[
+                styles.toggle,
+                reduceAnimations && { backgroundColor: colors.accent },
+              ]}
+            >
+              <View style={[
+                styles.toggleKnob,
+                {
+                  backgroundColor: reduceAnimations ? colors.bg_base : colors.text_ghost,
+                  transform: [{ translateX: reduceAnimations ? 16 : 0 }],
+                },
+              ]} />
+            </TouchableOpacity>
+          </SettingItem>
+        </SettingSection>
 
-        {/* ── Ambient Sound ── */}
-        <SectionHeader label="AMBIENT SOUND" colors={colors} />
-        <View style={[styles.section, { backgroundColor: colors.surfaceRaised, borderColor: colors.border }]}>
-          <SettingRow
-            icon="music"
-            iconColor={palette.dustyBlue}
-            label="Track"
-            value={
-              <TouchableOpacity onPress={handleAmbientCycle}>
-                <Text style={[styles.valueText, { color: palette.dustyBlue }]}>
-                  {ambientTrack === 'none' ? 'off' : ambientTrack}
+        {/* Juliet */}
+        <SettingSection title={companionName.toUpperCase()}>
+          <SettingItem label="Her name">
+            {editingCompanionName ? (
+              <TextInput
+                style={[styles.nameInput, ui.body, { color: colors.text_primary }]}
+                value={tempCompanionName}
+                onChangeText={setTempCompanionName}
+                onSubmitEditing={handleCompanionNameSave}
+                onBlur={handleCompanionNameSave}
+                autoFocus
+                maxLength={20}
+              />
+            ) : (
+              <TouchableOpacity onPress={() => setEditingCompanionName(true)}>
+                <Text style={[ui.body, { color: colors.text_secondary }]}>
+                  {companionName}
                 </Text>
               </TouchableOpacity>
-            }
-            colors={colors}
-          />
-        </View>
+            )}
+          </SettingItem>
+          
+          <SettingItem
+            label="Context reset"
+            onPress={handleContextReset}
+          >
+            <Text style={[styles.destructiveText, ui.caption, { color: colors.danger }]}>
+              forget what you know about me
+            </Text>
+          </SettingItem>
+        </SettingSection>
 
-        {/* ── AI Companion ── */}
-        <SectionHeader label="AI COMPANION" colors={colors} />
-        <View style={[styles.section, { backgroundColor: colors.surfaceRaised, borderColor: colors.border }]}>
-          <SettingRow
-            icon="cloud"
-            iconColor={palette.deepMoss}
-            label="Cloud AI (Pollinations)"
-            value={
-              <Switch
-                value={companionUseCloud}
-                onValueChange={handleToggleCloud}
-                trackColor={{ false: colors.border, true: `${palette.deepMoss}60` }}
-                thumbColor={companionUseCloud ? palette.deepMoss : colors.text.muted}
-              />
-            }
-            colors={colors}
-          />
-          <View style={[styles.noteRow, { borderTopColor: colors.divider }]}>
-            <Feather name="info" size={12} color={colors.text.muted} />
-            <Text style={[styles.noteText, { color: colors.text.muted }]}>
-              Cloud AI uses Pollinations — no account required. Prompts are sent to a third-party server. Disable for full offline privacy.
+        {/* Privacy */}
+        <SettingSection title="PRIVACY">
+          <SettingItem label="Lock with biometrics">
+            <TouchableOpacity
+              onPress={() => setBiometricEnabled(!biometricEnabled)}
+              style={[
+                styles.toggle,
+                biometricEnabled && { backgroundColor: colors.accent },
+              ]}
+            >
+              <View style={[
+                styles.toggleKnob,
+                {
+                  backgroundColor: biometricEnabled ? colors.bg_base : colors.text_ghost,
+                  transform: [{ translateX: biometricEnabled ? 16 : 0 }],
+                },
+              ]} />
+            </TouchableOpacity>
+          </SettingItem>
+          
+          <View style={styles.privacyNote}>
+            <Text style={[
+              styles.privacyNoteText,
+              ui.micro,
+              { color: colors.text_ghost },
+            ]}>
+              everything stays here
+            </Text>
+            <Text style={[
+              styles.privacyNoteSubtext,
+              ui.micro,
+              { color: colors.text_ghost },
+            ]}>
+              your notes, conversations, and everything juliet knows about you live only on this phone. nothing is sent anywhere, ever.
             </Text>
           </View>
-        </View>
+        </SettingSection>
 
-        {/* ── About ── */}
-        <SectionHeader label="ABOUT" colors={colors} />
-        <View style={[styles.section, { backgroundColor: colors.surfaceRaised, borderColor: colors.border }]}>
-          <SettingRow
-            icon="info"
-            label="Version"
-            value={<Text style={[styles.valueText, { color: colors.text.muted }]}>v{APP_VERSION}</Text>}
-            colors={colors}
+        {/* Your Data */}
+        <SettingSection title="YOUR DATA">
+          <SettingItem
+            label="Export everything"
+            onPress={handleDataExport}
           />
-          <SettingRow
-            icon="heart"
-            label="Open source"
-            onPress={() => Linking.openURL('https://github.com/sanctum-app')}
-            chevron
-            colors={colors}
-          />
-          <SettingRow
-            icon="shield"
-            label="Privacy policy"
-            onPress={() => Linking.openURL('https://sanctum-app.dev/privacy')}
-            chevron
-            colors={colors}
-          />
-        </View>
-
-        {/* ── Encryption note ── */}
-        <View style={[styles.encryptionNote, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Feather name="lock" size={13} color={colors.text.muted} />
-          <Text style={[styles.encryptionNoteText, { color: colors.text.muted }]}>
-            Your encryption key never leaves this device. Sanctum cannot access your data — not even the developer.
-          </Text>
-        </View>
+          
+          <SettingItem
+            label="Clear all data"
+            onPress={handleDataClear}
+          >
+            <Text style={[styles.destructiveText, ui.caption, { color: colors.danger }]}>
+              delete everything
+            </Text>
+          </SettingItem>
+        </SettingSection>
       </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-
-  pageHeader: {
-    paddingHorizontal: layout.screenPadding,
-    paddingBottom: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+  container: {
+    flex: 1,
   },
-  pageTitle: {
-    fontFamily: fontFamilies.journal,
-    fontSize: fontSize['2xl'],
-    fontWeight: '400',
-    letterSpacing: -0.4,
+  scrollView: {
+    flex: 1,
   },
-
-  scroll: {
-    paddingHorizontal: layout.screenPadding,
-    paddingTop: spacing[4],
+  content: {
+    paddingHorizontal: spacing.lg,
   },
-
-  sectionHeader: {
-    fontFamily: fontFamilies.ui,
-    fontSize: 11,
-    fontWeight: fontWeight.semibold,
-    letterSpacing: 1.2,
-    marginBottom: 8,
-    marginTop: spacing[5],
-  },
-
   section: {
-    borderRadius: radius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-    overflow: 'hidden',
+    marginBottom: spacing.xl * 2,
   },
-
-  settingRow: {
+  sectionTitle: {
+    marginBottom: spacing.lg,
+    // ALL CAPS + letter spacing as specified
+  },
+  sectionContent: {
+    // Container for section items
+  },
+  settingItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing[4],
-    paddingVertical: 14,
+    justifyContent: 'space-between',
+    paddingVertical: spacing.md,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    gap: spacing[3],
-  },
-  settingIcon: {
-    width: 30,
-    height: 30,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   settingLabel: {
-    fontFamily: fontFamilies.ui,
-    fontSize: fontSize.sm,
+    flex: 1,
   },
   settingValue: {
-    marginLeft: 'auto',
+    marginLeft: spacing.md,
   },
-  valueText: {
-    fontFamily: fontFamilies.ui,
-    fontSize: fontSize.sm,
+  toggle: {
+    width: 36,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    paddingHorizontal: 2,
   },
-
-  noteRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing[2],
-    paddingHorizontal: spacing[4],
-    paddingVertical: spacing[3],
-    borderTopWidth: StyleSheet.hairlineWidth,
+  toggleKnob: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
   },
-  noteText: {
-    fontFamily: fontFamilies.ui,
-    fontSize: fontSize.xs,
+  nameInput: {
+    textAlign: 'right',
+    minWidth: 80,
+  },
+  destructiveText: {
+    fontStyle: 'italic',
+  },
+  privacyNote: {
+    paddingTop: spacing.lg,
+    paddingHorizontal: spacing.sm,
+  },
+  privacyNoteText: {
+    marginBottom: spacing.xs,
+    fontWeight: '500',
+  },
+  privacyNoteSubtext: {
     lineHeight: 16,
-    flex: 1,
-  },
-
-  encryptionNote: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing[2],
-    marginTop: spacing[5],
-    padding: spacing[4],
-    borderRadius: radius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  encryptionNoteText: {
-    fontFamily: fontFamilies.ui,
-    fontSize: fontSize.xs,
-    lineHeight: 17,
-    flex: 1,
   },
 });

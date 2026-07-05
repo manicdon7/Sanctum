@@ -1,78 +1,45 @@
+// Sanctum Animation Constants
+// Duration, easing, and spring configurations
+
 import { Easing } from 'react-native-reanimated';
 
-/**
- * Sanctum Animation Constants
- * All animation durations and easing curves defined here.
- * Never use the core React Native Animated API — use Reanimated v3.
- */
-
-export const durations = {
-  instant: 0,
-  fast: 150,
-  normal: 300,
-  slow: 450,
-  flip: 350,       // flashcard 3D flip
-  ambient: 6000,   // room prompt breathing cycle
-  ambientSlow: 8000, // graph node drift cycle
-  gradient: 2000,  // time-of-day gradient transition
-} as const;
-
-export const springs = {
-  /** Default spring for most UI interactions */
-  default: {
-    damping: 18,
-    stiffness: 180,
-    mass: 1,
+export const animations = {
+  // Duration constants
+  duration: {
+    fast: 200,
+    normal: 350,
+    slow: 500,
+    breathing: 1500,    // for audio fade in/out
+    thinking: 800,      // Juliet's thinking pause
+    julietPulse: 4000,  // normal Juliet dot pulse cycle
+    julietActive: 1200, // Juliet processing pulse cycle
+    julietWaiting: 6000, // when user hasn't spoken in 48h
   },
-  /** Overshoot spring for mood emoji bounce */
-  overshoot: {
-    damping: 12,
-    stiffness: 200,
-    mass: 0.8,
+  
+  // Easing curves
+  easing: {
+    standard: Easing.out(Easing.cubic),
+    gentle: Easing.inOut(Easing.cubic),
+    bounce: Easing.elastic(1.2),
+    breathe: Easing.inOut(Easing.sin),
   },
-  /** Gentle spring for card reveals */
-  gentle: {
-    damping: 24,
-    stiffness: 120,
-    mass: 1,
+  
+  // Spring configurations for reanimated
+  spring: {
+    gentle: {
+      damping: 20,
+      stiffness: 200,
+    },
+    bouncy: {
+      damping: 15,
+      stiffness: 400,
+    },
+    soft: {
+      damping: 25,
+      stiffness: 150,
+    },
   },
 } as const;
 
-/**
- * Easing presets using Reanimated's Easing module.
- * These are created lazily to avoid import issues before the
- * Reanimated worklet is set up.
- */
-export const easings = {
-  /** Default easing for most transitions */
-  default: Easing.out(Easing.cubic),
-  /** Ease in for close/dismiss transitions */
-  close: Easing.in(Easing.cubic),
-  /** Overshoot for mood bounce */
-  overshoot: Easing.out(Easing.back(1.4)),
-  /** Ambient sinusoidal breathing */
-  ambient: Easing.inOut(Easing.sin),
-  /** Smooth arc fill for skill charts */
-  smooth: Easing.out(Easing.cubic),
-} as const;
-
-/**
- * Breathing animation config for the prompt card.
- * scale: 1.0 → 1.015 → 1.0 on repeat
- */
-export const breathingConfig = {
-  minScale: 1.0,
-  maxScale: 1.015,
-  duration: durations.ambient,
-  easing: easings.ambient,
-} as const;
-
-/**
- * Node drift config for knowledge garden graph.
- * Each node gets an independent random phase offset on mount.
- */
-export const nodeDriftConfig = {
-  amplitude: 2.5,        // px
-  minPeriod: 6000,       // ms
-  maxPeriod: 10000,      // ms
-} as const;
+export type AnimationDuration = keyof typeof animations.duration;
+export type AnimationEasing = keyof typeof animations.easing;

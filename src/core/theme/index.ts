@@ -1,14 +1,12 @@
-/**
- * Sanctum Theme — single import point
- * import { colors, typography, spacing, radius, animations } from '@/core/theme';
- */
+// Sanctum Theme System
+// Central export for all design tokens
 
-export { lightColors, darkColors, palette } from './colors';
-export type { ColorTheme } from './colors';
+export { palette, type ColorScheme, type ThemeColors } from './colors';
+export { typography, display, ui, type DisplayVariant, type UIVariant } from './typography';
+export { spacing, type SpacingKey } from './spacing';
+export { animations, type AnimationDuration, type AnimationEasing } from './animations';
+export { shadows, type ShadowVariant } from './shadows';
+export { radius, borderRadius, type RadiusKey } from './radius';
 
-export { typography, fontFamilies, fontSize, fontWeight, lineHeight, letterSpacing } from './typography';
-
-export { spacing, radius, elevation, hitSlop } from './spacing';
-export type { SpacingKey } from './spacing';
-
-export { durations, springs, easings, breathingConfig, nodeDriftConfig } from './animations';
+// Theme hook will be implemented later
+export { useTheme } from './useTheme';
