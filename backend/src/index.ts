@@ -66,6 +66,17 @@ app.use(limiter);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.raw({ type: 'application/octet-stream', limit: '200mb' }));
 
+// Database connection middleware for serverless/cold starts
+app.use(async (_req, _res, next) => {
+  try {
+    await connectMongo();
+    next();
+  } catch (err) {
+    console.error('[Sanctum Backend] Database connection failed:', err);
+    _res.status(500).json({ error: 'Internal database connection error' });
+  }
+});
+
 // ── Routes ───────────────────────────────────────────────────────────────────
 
 app.use('/sync', syncRouter);
@@ -102,4 +113,8 @@ async function start() {
   }
 }
 
-start();
+if (!process.env.VERCEL) {
+  start();
+}
+
+export default app;
